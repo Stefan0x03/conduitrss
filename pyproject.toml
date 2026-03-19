@@ -1,0 +1,28 @@
+[project]
+name = "conduit"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp==3.1.1",
+    "feedparser",
+    "boto3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "mypy",
+    "pre-commit",
+    "boto3-stubs[dynamodb]",
+]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true

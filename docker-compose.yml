@@ -1,0 +1,22 @@
+services:
+  conduit:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      AUTH_DISABLED: "true"
+      DYNAMODB_TABLE: conduit-feeds
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      AWS_ENDPOINT_URL: http://dynamodb-local:8000
+    volumes:
+      - ./seeds/feeds.opml:/app/seeds/feeds.opml:ro
+    depends_on:
+      - dynamodb-local
+
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    ports:
+      - "8001:8000"
+    command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"

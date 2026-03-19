@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Mypy
+.mypy_cache/
+
+# Ruff
+.ruff_cache/
+
+# Pytest
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# AWS / CDK
+cdk.out/

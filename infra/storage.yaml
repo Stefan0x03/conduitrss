@@ -1,0 +1,40 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Conduit - DynamoDB table for feed subscriptions
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+
+Resources:
+  FeedsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "conduit-feeds-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+
+Outputs:
+  TableName:
+    Value: !Ref FeedsTable
+    Export:
+      Name: !Sub "conduit-feeds-table-name-${Environment}"
+  TableArn:
+    Value: !GetAtt FeedsTable.Arn
+    Export:
+      Name: !Sub "conduit-feeds-table-arn-${Environment}"

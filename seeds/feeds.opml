@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="1.0">
+  <head>
+    <title>Conduit RSS Feeds</title>
+  </head>
+  <body>
+    <!-- Replace this file with your InoReader OPML export before running locally -->
+    <outline text="Example Feeds" title="Example Feeds">
+      <outline type="rss"
+               text="Hacker News"
+               title="Hacker News"
+               xmlUrl="https://news.ycombinator.com/rss"
+               htmlUrl="https://news.ycombinator.com"/>
+    </outline>
+  </body>
+</opml>

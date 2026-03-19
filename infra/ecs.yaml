@@ -1,0 +1,159 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Conduit - ECS Fargate cluster, task definition, service, IAM roles
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+  Domain:
+    Type: String
+  ImageUri:
+    Type: String
+    Description: ECR image URI (e.g. 123456789.dkr.ecr.us-east-1.amazonaws.com/conduit:latest)
+  PrivateSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Private subnets for ECS tasks
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  CognitoUserPoolId:
+    Type: String
+  CognitoAppClientId:
+    Type: String
+
+Resources:
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "conduit-${Environment}"
+      CapacityProviders:
+        - FARGATE
+      DefaultCapacityProviderStrategy:
+        - CapacityProvider: FARGATE
+          Weight: 1
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "conduit-task-execution-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "conduit-task-role-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:UpdateItem
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/conduit-feeds-${Environment}"
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/conduit-${Environment}"
+      RetentionInDays: 30
+
+  EcsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow inbound from ALB only
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          SourceSecurityGroupId:
+            Fn::ImportValue: !Sub "conduit-alb-sg-id-${Environment}"
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: "0.0.0.0/0"
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "conduit-${Environment}"
+      Cpu: "256"
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: conduit
+          Image: !Ref ImageUri
+          PortMappings:
+            - ContainerPort: 8000
+              Protocol: tcp
+          Environment:
+            - Name: DYNAMODB_TABLE
+              Value: !Sub "conduit-feeds-${Environment}"
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+            - Name: COGNITO_USER_POOL_ID
+              Value: !Ref CognitoUserPoolId
+            - Name: COGNITO_APP_CLIENT_ID
+              Value: !Ref CognitoAppClientId
+            - Name: DOMAIN
+              Value: !Ref Domain
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: conduit
+          Essential: true
+          ReadonlyRootFilesystem: true
+
+  EcsService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "conduit-${Environment}"
+      Cluster: !Ref EcsCluster
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref EcsSecurityGroup
+          Subnets: !Ref PrivateSubnetIds
+      LoadBalancers:
+        - ContainerName: conduit
+          ContainerPort: 8000
+          TargetGroupArn:
+            Fn::ImportValue: !Sub "conduit-target-group-arn-${Environment}"
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+
+Outputs:
+  ClusterName:
+    Value: !Ref EcsCluster
+  ServiceName:
+    Value: !GetAtt EcsService.Name

@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Conduit - Cognito User Pool and App Client
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+  Domain:
+    Type: String
+    Description: Service domain (e.g. conduit.YOUR_DOMAIN)
+
+Resources:
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "conduit-${Environment}"
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+      MfaConfiguration: "OFF"
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub "conduit-auth-${Environment}"
+      UserPoolId: !Ref UserPool
+
+  AppClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub "conduit-app-${Environment}"
+      UserPoolId: !Ref UserPool
+      GenerateSecret: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes:
+        - openid
+        - profile
+        - email
+      CallbackURLs:
+        - !Sub "https://${Domain}/oauth/callback"
+      LogoutURLs:
+        - !Sub "https://${Domain}/logout"
+      SupportedIdentityProviders:
+        - COGNITO
+      ExplicitAuthFlows:
+        - ALLOW_REFRESH_TOKEN_AUTH
+
+Outputs:
+  UserPoolId:
+    Value: !Ref UserPool
+    Export:
+      Name: !Sub "conduit-user-pool-id-${Environment}"
+  UserPoolArn:
+    Value: !GetAtt UserPool.Arn
+    Export:
+      Name: !Sub "conduit-user-pool-arn-${Environment}"
+  AppClientId:
+    Value: !Ref AppClient
+    Export:
+      Name: !Sub "conduit-app-client-id-${Environment}"
+  CognitoDomain:
+    Value: !Sub "conduit-auth-${Environment}.auth.${AWS::Region}.amazoncognito.com"
+    Export:
+      Name: !Sub "conduit-cognito-domain-${Environment}"
