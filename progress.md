@@ -26,8 +26,8 @@
 - [x] `src/conduit/__init__.py`
 - [x] `tests/{unit,integration}/__init__.py`
 - [x] `.venv` created with Python 3.12.10
-- [ ] `pre-commit install` — activate gitleaks hook in local git repo
-- [ ] `[tool.pytest.ini_options]` added to `pyproject.toml` — separate unit/integration via markers
+- [x] `pre-commit install` — activate gitleaks hook in local git repo
+- [x] `[tool.pytest.ini_options]` added to `pyproject.toml` — separate unit/integration via markers
 
 ---
 
