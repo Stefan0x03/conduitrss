@@ -53,47 +53,48 @@
 
 ## Stage 2 — `feeds.py` + unit tests
 
-- [ ] Define `FeedItem` TypedDict: `title`, `link`, `published`, `summary`
-- [ ] Define `AggregatedFeedItem` TypedDict: `title`, `link`, `published`, `summary`, `feed_url`
-- [ ] Implement `validate_feed(url)` — confirm URL is reachable and parses as RSS/Atom; raise on failure
-- [ ] Implement `fetch_items(url, limit)` — live fetch single feed, return `list[FeedItem]`; run `feedparser.parse()` in thread pool executor
-- [ ] Implement `fetch_all_items(urls, per_feed_limit)` — concurrent fetch via `asyncio.gather`, return `list[AggregatedFeedItem]`
-- [ ] Normalize field differences between RSS 2.0 and Atom (`published` vs `updated`, `summary` vs `content`)
-- [ ] Handle `bozo` flag and malformed feeds gracefully (log warning, return empty list for that feed)
-- [ ] No AWS dependencies in this module
-- [ ] Passes `mypy --strict` and `ruff`
-- [ ] `tests/unit/test_feeds.py`
-  - [ ] Mock `feedparser.parse`
-  - [ ] Test `FeedItem` normalization for RSS 2.0 feed
-  - [ ] Test `FeedItem` normalization for Atom feed
-  - [ ] Test `validate_feed` rejects non-feed URLs
-  - [ ] Test `bozo` feed returns empty list without raising
-  - [ ] Test `fetch_all_items` calls `fetch_items` concurrently and attaches `feed_url`
+- [x] Define `FeedItem` TypedDict: `title`, `link`, `published`, `summary`
+- [x] Define `AggregatedFeedItem` TypedDict: `title`, `link`, `published`, `summary`, `feed_url`
+- [x] Implement `validate_feed(url)` — confirm URL is reachable and parses as RSS/Atom; raise on failure
+- [x] Implement `fetch_items(url, limit)` — live fetch single feed, return `list[FeedItem]`; run `feedparser.parse()` in thread pool executor
+- [x] Implement `fetch_all_items(urls, per_feed_limit)` — concurrent fetch via `asyncio.gather`, return `list[AggregatedFeedItem]`
+- [x] Normalize field differences between RSS 2.0 and Atom (`published` vs `updated`, `summary` vs `content`)
+- [x] Handle `bozo` flag and malformed feeds gracefully (log warning, return empty list for that feed)
+- [x] No AWS dependencies in this module
+- [x] Passes `mypy --strict` and `ruff`
+- [x] `tests/unit/test_feeds.py`
+  - [x] Mock `feedparser.parse`
+  - [x] Test `FeedItem` normalization for RSS 2.0 feed
+  - [x] Test `FeedItem` normalization for Atom feed
+  - [x] Test `validate_feed` rejects non-feed URLs
+  - [x] Test `bozo` feed returns empty list without raising
+  - [x] Test `fetch_all_items` calls `fetch_items` concurrently and attaches `feed_url`
 
 ---
 
 ## Stage 3 — `server.py` + unit tests
 
-- [ ] Inspect `fastmcp==3.1.1` source to confirm OAuth proxy API before writing
-- [ ] Instantiate `FastMCP` app
-- [ ] Wire Cognito OAuth adapter (authorization endpoint, token endpoint, JWKS)
-- [ ] Extract authenticated user `sub` claim from FastMCP `Context`
-- [ ] Implement `AUTH_DISABLED=true` branch — skip OAuth, inject `local-dev-user`
-- [ ] Health check endpoint (`/healthz`) for ALB
-- [ ] OPML seed loader — parse `seeds/feeds.opml` at startup when `AUTH_DISABLED=true`, pre-populate DynamoDB for `local-dev-user`
-- [ ] `if __name__ == "__main__"` entry point so `python -m conduit.server` works
-- [ ] Register `add_feed` tool — calls `feeds.validate_feed(url)` first, then `storage.add_feed()`
-- [ ] Register `remove_feed` tool — calls `storage.remove_feed()`
-- [ ] Register `list_feeds` tool — calls `storage.list_feeds()`
-- [ ] Register `get_feed_items` tool — calls `storage.get_feed()` to verify subscription, then `feeds.fetch_items()`
-- [ ] Register `get_all_items` tool — calls `storage.list_feeds()`, computes `per_feed_limit = limit // len(feeds)`, calls `feeds.fetch_all_items(urls, per_feed_limit)`
-- [ ] No business logic in this module
-- [ ] Passes `mypy --strict` and `ruff`
-- [ ] `tests/unit/test_server.py`
-  - [ ] Test `AUTH_DISABLED` identity injection
-  - [ ] Test `add_feed` calls `validate_feed` before `storage.add_feed`
-  - [ ] Test `get_feed_items` raises when user is not subscribed
-  - [ ] Test `get_all_items` computes correct `per_feed_limit`
+- [x] Inspect `fastmcp==3.1.1` source to confirm OAuth proxy API before writing
+- [x] Instantiate `FastMCP` app
+- [x] Wire Cognito OAuth adapter (authorization endpoint, token endpoint, JWKS)
+- [x] Extract authenticated user `sub` claim from FastMCP `Context`
+- [x] Implement `AUTH_DISABLED=true` branch — skip OAuth, inject `local-dev-user`
+- [x] Health check endpoint (`/healthz`) for ALB
+- [x] OPML seed loader — parse `seeds/feeds.opml` at startup when `AUTH_DISABLED=true`, pre-populate DynamoDB for `local-dev-user`
+- [x] `if __name__ == "__main__"` entry point so `python -m conduit.server` works
+- [x] Register `add_feed` tool — calls `feeds.validate_feed(url)` first, then `storage.add_feed()`
+- [x] Register `remove_feed` tool — calls `storage.remove_feed()`
+- [x] Register `list_feeds` tool — calls `storage.list_feeds()`
+- [x] Register `get_feed_items` tool — calls `storage.get_feed()` to verify subscription, then `feeds.fetch_items()`
+- [x] Register `get_all_items` tool — calls `storage.list_feeds()`, computes `per_feed_limit = limit // len(feeds)`, calls `feeds.fetch_all_items(urls, per_feed_limit)`
+- [x] No business logic in this module
+- [x] Passes `mypy --strict` and `ruff`
+- [x] `tests/unit/test_server.py`
+  - [x] Test `AUTH_DISABLED` identity injection
+  - [x] Test `add_feed` calls `validate_feed` before `storage.add_feed`
+  - [x] Test `get_feed_items` raises when user is not subscribed
+  - [x] Test `get_all_items` computes correct `per_feed_limit`
+  - [x] Test `get_all_items` handles zero subscribed feeds without dividing by zero
 
 ---
 
@@ -124,5 +125,5 @@
 
 ## Open Questions
 
-- How does FastMCP 3.1.1 expose user identity from the Cognito JWT in tool context? (Inspect source at Stage 3 start)
-- Does FastMCP 3.1.1 support adding plain HTTP routes (e.g. `/healthz`) alongside MCP tools?
+- ~~How does FastMCP 3.1.1 expose user identity from the Cognito JWT in tool context?~~ → `get_access_token()` from `fastmcp.server.dependencies`; the `sub` claim is in `token.claims["sub"]`.
+- ~~Does FastMCP 3.1.1 support adding plain HTTP routes (e.g. `/healthz`) alongside MCP tools?~~ → Yes, via `@mcp.custom_route("/healthz", methods=["GET"])` decorator.
