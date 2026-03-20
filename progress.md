@@ -33,21 +33,21 @@
 
 ## Stage 1 — `storage.py` + unit tests
 
-- [ ] Define `FeedRecord` TypedDict: `pk`, `sk`, `url`, `label`, `addedAt`, `lastFetched`, `etag`
-- [ ] `DYNAMODB_TABLE` sourced from environment variable, fail fast if missing
-- [ ] All key construction (`user#{userId}`, `feed#{feedUrl}`) contained in this module
-- [ ] Implement `add_feed(user_id, url, label)` — PutItem with full key schema; `lastFetched` and `etag` stored as empty strings (reserved)
-- [ ] Implement `remove_feed(user_id, url)` — DeleteItem
-- [ ] Implement `list_feeds(user_id)` — Query by PK, return list of `FeedRecord`
-- [ ] Implement `get_feed(user_id, url)` — GetItem, return `FeedRecord | None` (used by server to verify subscription ownership)
-- [ ] Passes `mypy --strict` and `ruff`
-- [ ] `tests/unit/test_storage.py`
-  - [ ] Mock boto3 client
-  - [ ] Test key construction for `add_feed`
-  - [ ] Test `add_feed` — correct PutItem shape including reserved fields
-  - [ ] Test `remove_feed` — correct DeleteItem call
-  - [ ] Test `list_feeds` — correct Query and return shape
-  - [ ] Test `get_feed` — returns `FeedRecord` when found, `None` when not found
+- [x] Define `FeedRecord` TypedDict: `pk`, `sk`, `url`, `label`, `addedAt`, `lastFetched`, `etag`
+- [x] `DYNAMODB_TABLE` sourced from environment variable, fail fast if missing
+- [x] All key construction (`user#{userId}`, `feed#{feedUrl}`) contained in this module
+- [x] Implement `add_feed(user_id, url, label)` — PutItem with full key schema; `lastFetched` and `etag` stored as empty strings (reserved)
+- [x] Implement `remove_feed(user_id, url)` — DeleteItem
+- [x] Implement `list_feeds(user_id)` — Query by PK, return list of `FeedRecord`
+- [x] Implement `get_feed(user_id, url)` — GetItem, return `FeedRecord | None` (used by server to verify subscription ownership)
+- [x] Passes `mypy --strict` and `ruff`
+- [x] `tests/unit/test_storage.py`
+  - [x] Mock boto3 client
+  - [x] Test key construction for `add_feed`
+  - [x] Test `add_feed` — correct PutItem shape including reserved fields
+  - [x] Test `remove_feed` — correct DeleteItem call
+  - [x] Test `list_feeds` — correct Query and return shape
+  - [x] Test `get_feed` — returns `FeedRecord` when found, `None` when not found
 
 ---
 
