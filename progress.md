@@ -100,17 +100,17 @@
 
 ## Stage 4 — Integration Tests
 
-- [ ] `tests/integration/conftest.py` — fixtures: DynamoDB Local client, pre-created table, seeded `local-dev-user`
-- [ ] `tests/integration/test_server.py` against DynamoDB Local with `AUTH_DISABLED=true`
-  - [ ] `add_feed` end-to-end (validates feed, stores subscription)
-  - [ ] `add_feed` duplicate is idempotent
-  - [ ] `remove_feed` end-to-end
-  - [ ] `remove_feed` on non-existent feed is handled gracefully
-  - [ ] `list_feeds` end-to-end
-  - [ ] `get_feed_items` rejects unsubscribed URL
-  - [ ] `get_feed_items` end-to-end for subscribed feed
-  - [ ] `get_all_items` end-to-end across multiple feeds
-  - [ ] `get_all_items` respects per-feed cap
+- [x] `tests/integration/conftest.py` — fixtures: DynamoDB Local client, pre-created table, seeded `local-dev-user`
+- [x] `tests/integration/test_server.py` against DynamoDB Local with `AUTH_DISABLED=true`
+  - [x] `add_feed` end-to-end (validates feed, stores subscription)
+  - [x] `add_feed` duplicate is idempotent
+  - [x] `remove_feed` end-to-end
+  - [x] `remove_feed` on non-existent feed is handled gracefully
+  - [x] `list_feeds` end-to-end
+  - [x] `get_feed_items` rejects unsubscribed URL
+  - [x] `get_feed_items` end-to-end for subscribed feed
+  - [x] `get_all_items` end-to-end across multiple feeds
+  - [x] `get_all_items` respects per-feed cap
 
 ---
 

@@ -1,12 +1,16 @@
 """DynamoDB CRUD for Conduit feed subscriptions."""
 
+from __future__ import annotations
+
 import os
 from datetime import UTC, datetime
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 import boto3
-from mypy_boto3_dynamodb import DynamoDBClient
-from mypy_boto3_dynamodb.type_defs import AttributeValueTypeDef
+
+if TYPE_CHECKING:
+    from mypy_boto3_dynamodb import DynamoDBClient
+    from mypy_boto3_dynamodb.type_defs import AttributeValueTypeDef
 
 DYNAMODB_TABLE: str = os.environ["DYNAMODB_TABLE"]
 
