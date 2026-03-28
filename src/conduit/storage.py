@@ -38,8 +38,8 @@ def _sk(feed_url: str) -> str:
 def add_feed(user_id: str, url: str, label: str | None = None) -> None:
     """Add a feed subscription for the given user."""
     item: dict[str, AttributeValueTypeDef] = {
-        "pk": {"S": _pk(user_id)},
-        "sk": {"S": _sk(url)},
+        "PK": {"S": _pk(user_id)},
+        "SK": {"S": _sk(url)},
         "url": {"S": url},
         "addedAt": {"S": datetime.now(UTC).isoformat()},
         "lastFetched": {"S": ""},
@@ -54,7 +54,7 @@ def remove_feed(user_id: str, url: str) -> None:
     """Remove a feed subscription for the given user."""
     _client.delete_item(
         TableName=DYNAMODB_TABLE,
-        Key={"pk": {"S": _pk(user_id)}, "sk": {"S": _sk(url)}},
+        Key={"PK": {"S": _pk(user_id)}, "SK": {"S": _sk(url)}},
     )
 
 
@@ -62,7 +62,7 @@ def list_feeds(user_id: str) -> list[FeedRecord]:
     """Return all feed subscriptions for the given user."""
     response = _client.query(
         TableName=DYNAMODB_TABLE,
-        KeyConditionExpression="pk = :pk",
+        KeyConditionExpression="PK = :pk",
         ExpressionAttributeValues={":pk": {"S": _pk(user_id)}},
     )
     records: list[FeedRecord] = []
@@ -75,7 +75,7 @@ def get_feed(user_id: str, url: str) -> FeedRecord | None:
     """Return a single feed subscription, or None if not found."""
     response = _client.get_item(
         TableName=DYNAMODB_TABLE,
-        Key={"pk": {"S": _pk(user_id)}, "sk": {"S": _sk(url)}},
+        Key={"PK": {"S": _pk(user_id)}, "SK": {"S": _sk(url)}},
     )
     item = response.get("Item")
     if item is None:
@@ -86,8 +86,8 @@ def get_feed(user_id: str, url: str) -> FeedRecord | None:
 def _item_to_record(item: dict[str, AttributeValueTypeDef]) -> FeedRecord:
     label_attr = item.get("label")
     return FeedRecord(
-        pk=item["pk"]["S"],
-        sk=item["sk"]["S"],
+        pk=item["PK"]["S"],
+        sk=item["SK"]["S"],
         url=item["url"]["S"],
         label=label_attr["S"] if label_attr is not None else None,
         addedAt=item["addedAt"]["S"],

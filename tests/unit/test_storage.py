@@ -30,8 +30,8 @@ def test_add_feed_put_item_key_shape(mock_client: MagicMock) -> None:
     call_kwargs = mock_client.put_item.call_args
     item = call_kwargs.kwargs["Item"] if call_kwargs.kwargs else call_kwargs[1]["Item"]
 
-    assert item["pk"]["S"] == "user#alice"
-    assert item["sk"]["S"] == "feed#https://example.com/feed.xml"
+    assert item["PK"]["S"] == "user#alice"
+    assert item["SK"]["S"] == "feed#https://example.com/feed.xml"
     assert item["url"]["S"] == "https://example.com/feed.xml"
     assert item["lastFetched"]["S"] == ""
     assert item["etag"]["S"] == ""
@@ -82,8 +82,8 @@ def test_remove_feed_delete_item(mock_client: MagicMock) -> None:
     mock_client.delete_item.assert_called_once_with(
         TableName=TABLE,
         Key={
-            "pk": {"S": "user#alice"},
-            "sk": {"S": "feed#https://example.com/feed.xml"},
+            "PK": {"S": "user#alice"},
+            "SK": {"S": "feed#https://example.com/feed.xml"},
         },
     )
 
@@ -95,8 +95,8 @@ def test_list_feeds_query_and_return_shape(mock_client: MagicMock) -> None:
     mock_client.query.return_value = {
         "Items": [
             {
-                "pk": {"S": "user#alice"},
-                "sk": {"S": "feed#https://example.com/feed.xml"},
+                "PK": {"S": "user#alice"},
+                "SK": {"S": "feed#https://example.com/feed.xml"},
                 "url": {"S": "https://example.com/feed.xml"},
                 "label": {"S": "Example"},
                 "addedAt": {"S": "2024-01-01T00:00:00+00:00"},
@@ -137,8 +137,8 @@ def test_get_feed_returns_record_when_found(mock_client: MagicMock) -> None:
 
     mock_client.get_item.return_value = {
         "Item": {
-            "pk": {"S": "user#alice"},
-            "sk": {"S": "feed#https://example.com/feed.xml"},
+            "PK": {"S": "user#alice"},
+            "SK": {"S": "feed#https://example.com/feed.xml"},
             "url": {"S": "https://example.com/feed.xml"},
             "addedAt": {"S": "2024-01-01T00:00:00+00:00"},
             "lastFetched": {"S": ""},
@@ -173,7 +173,7 @@ def test_get_feed_correct_key(mock_client: MagicMock) -> None:
     mock_client.get_item.assert_called_once_with(
         TableName=TABLE,
         Key={
-            "pk": {"S": "user#bob"},
-            "sk": {"S": "feed#https://feeds.example.org/rss"},
+            "PK": {"S": "user#bob"},
+            "SK": {"S": "feed#https://feeds.example.org/rss"},
         },
     )

@@ -216,12 +216,16 @@ async def get_feed_items(url: str, limit: int = 50) -> list[feeds.FeedItem]:
 
 @mcp.tool()
 async def get_all_items(limit: int = 200) -> list[feeds.AggregatedFeedItem]:
-    """Fetch live items across all subscribed feeds.
+    """Fetch a headline index across all subscribed feeds (no summaries).
+
+    Returns title, link, published, and feed_url for each item — summaries are
+    intentionally omitted to keep the payload small.  Use this tool to scan
+    and filter headlines, then call get_feed_items for full content on feeds
+    of interest.
 
     *limit* is divided evenly across feeds (``per_feed_limit = limit //
-    len(feeds)``).  Returns an empty list if no feeds are subscribed, avoiding
-    a ZeroDivisionError.  LLM consumers are expected to sort and filter the
-    returned items by ``published`` timestamp.
+    len(feeds)``).  Returns an empty list if no feeds are subscribed.  Sort
+    and filter by ``published`` timestamp on the LLM side.
     """
     user_id = _get_user_id()
     records = storage.list_feeds(user_id)

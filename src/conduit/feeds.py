@@ -21,7 +21,6 @@ class AggregatedFeedItem(TypedDict):
     title: str
     link: str
     published: str
-    summary: str
     feed_url: str
 
 
@@ -89,13 +88,18 @@ async def validate_feed(url: str) -> None:
 async def fetch_items(url: str, limit: int = 50) -> list[FeedItem]:
     """Fetch and return up to `limit` items from a single feed.
 
-    Returns an empty list if the feed is malformed; logs a warning.
+    Returns an empty list if the feed is unreachable, malformed, or raises
+    any exception during fetching; logs a warning in all failure cases.
     """
     loop = asyncio.get_running_loop()
-    parsed: object = await loop.run_in_executor(None, feedparser.parse, url)
+    try:
+        parsed: object = await loop.run_in_executor(None, feedparser.parse, url)
+    except Exception as exc:
+        logger.warning("Failed to fetch feed %r: %s — returning empty list", url, exc)
+        return []
     if _is_malformed(parsed):
-        exc: object = getattr(parsed, "bozo_exception", None)
-        logger.warning("Malformed feed %r: %s — returning empty list", url, exc)
+        exc2: object = getattr(parsed, "bozo_exception", None)
+        logger.warning("Malformed feed %r: %s — returning empty list", url, exc2)
         return []
     entries: object = getattr(parsed, "entries", [])
     if not isinstance(entries, list):
@@ -118,7 +122,6 @@ async def fetch_all_items(
                     title=item["title"],
                     link=item["link"],
                     published=item["published"],
-                    summary=item["summary"],
                     feed_url=url,
                 )
             )

@@ -118,7 +118,8 @@ get_feed_items(url: str, limit: int = 50) -> list[dict]
 
 get_all_items(limit: int = 200) -> list[dict]
 # Fetches live items across all subscribed feeds.
-# Returns title, link, published, summary, feed_url for each item.
+# Returns title, link, published, feed_url for each item (no summary).
+# Use get_feed_items to retrieve full content including summary for specific feeds.
 # Default limit is generous to support LLM-side time filtering.
 ```
 

@@ -54,7 +54,7 @@
 ## Stage 2 — `feeds.py` + unit tests
 
 - [x] Define `FeedItem` TypedDict: `title`, `link`, `published`, `summary`
-- [x] Define `AggregatedFeedItem` TypedDict: `title`, `link`, `published`, `summary`, `feed_url`
+- [x] Define `AggregatedFeedItem` TypedDict: `title`, `link`, `published`, `feed_url` (no summary — headline index only)
 - [x] Implement `validate_feed(url)` — confirm URL is reachable and parses as RSS/Atom; raise on failure
 - [x] Implement `fetch_items(url, limit)` — live fetch single feed, return `list[FeedItem]`; run `feedparser.parse()` in thread pool executor
 - [x] Implement `fetch_all_items(urls, per_feed_limit)` — concurrent fetch via `asyncio.gather`, return `list[AggregatedFeedItem]`
@@ -117,6 +117,7 @@
 ## Design Decisions (Recorded)
 
 - **`get_all_items` limit**: cap applied per feed (`per_feed_limit = limit // len(feeds)`) before fetching. LLM is expected to sort and filter the results.
+- **`get_all_items` payload**: `AggregatedFeedItem` omits `summary` — `get_all_items` is a headline index for discovery; call `get_feed_items` to retrieve full content for feeds of interest.
 - **`get_feed_items` ownership**: server verifies the authenticated user is subscribed to the requested URL via `storage.get_feed()` before fetching.
 - **`bozo` feeds**: log a warning and return an empty list for that feed rather than failing the whole request.
 - **`lastFetched` / `etag`**: stored as empty strings in DynamoDB, not acted on (reserved for future caching layer).
