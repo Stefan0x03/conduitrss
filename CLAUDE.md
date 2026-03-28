@@ -43,6 +43,7 @@ conduit/
 | Language | Python 3.12 |
 | MCP framework | FastMCP (latest stable — resolve and pin at project init) |
 | RSS/Atom parsing | feedparser |
+| Article extraction | trafilatura |
 | AWS SDK | boto3 |
 | Linting + formatting | ruff |
 | Type checking | mypy (strict) |
@@ -121,6 +122,16 @@ get_all_items(limit: int = 200) -> list[dict]
 # Returns title, link, published, feed_url for each item (no summary).
 # Use get_feed_items to retrieve full content including summary for specific feeds.
 # Default limit is generous to support LLM-side time filtering.
+
+get_article_content(url: str) -> dict
+# Fetches and extracts the full plain-text content of an article from its URL.
+# url should be the link field from a feed item (get_feed_items / get_all_items).
+# No subscription check — any URL the authenticated user supplies is accepted.
+# Returns: url, title, author, published, content (plain text, ≤100 000 chars),
+#          truncated (bool), error (empty string on success).
+# Uses trafilatura for HTML fetch and content extraction.
+# On failure (network error, no extractable content, etc.) returns the dict with
+# error set and content as an empty string — does not raise.
 ```
 
 **Design note:** Time-based filtering (e.g. "articles from the last 24 hours") is intentionally left to the LLM consumer. Tools return raw items with `published` timestamps and let Claude filter. Keep `limit` defaults generous enough to cover typical time windows.
@@ -140,6 +151,7 @@ get_all_items(limit: int = 200) -> list[dict]
 - Live HTTP fetching via feedparser
 - Feed validation (confirm URL is a valid RSS/Atom feed)
 - Item normalization (consistent dict shape regardless of RSS vs Atom)
+- Article content extraction via trafilatura (`get_article_content`)
 - No AWS dependencies
 
 ### `storage.py`

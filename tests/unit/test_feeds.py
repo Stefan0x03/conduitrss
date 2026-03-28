@@ -8,8 +8,10 @@ import pytest
 
 from conduit.feeds import (
     AggregatedFeedItem,
+    ArticleContent,
     FeedItem,
     fetch_all_items,
+    fetch_article_content,
     fetch_items,
     validate_feed,
 )
@@ -244,3 +246,96 @@ def test_fetch_all_items_attaches_feed_url() -> None:
 
     assert by_feed["https://feed1.example.com/rss"][0]["title"] == "T1"
     assert by_feed["https://feed2.example.com/rss"][0]["title"] == "T2"
+
+
+# ---------------------------------------------------------------------------
+# fetch_article_content — success
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_article_content_success() -> None:
+    """fetch_article_content returns a populated ArticleContent on success."""
+    html = "<html><body><article>Full article text here.</article></body></html>"
+    mock_metadata = MagicMock()
+    mock_metadata.title = "Article Title"
+    mock_metadata.author = "Jane Doe"
+    mock_metadata.date = "2024-06-01"
+
+    with (
+        patch("trafilatura.fetch_url", return_value=html),
+        patch("trafilatura.extract_metadata", return_value=mock_metadata),
+        patch("trafilatura.extract", return_value="Full article text here."),
+    ):
+        result: ArticleContent = asyncio.run(
+            fetch_article_content("https://example.com/article")
+        )
+
+    assert result["url"] == "https://example.com/article"
+    assert result["title"] == "Article Title"
+    assert result["author"] == "Jane Doe"
+    assert result["published"] == "2024-06-01"
+    assert result["content"] == "Full article text here."
+    assert result["truncated"] is False
+    assert result["error"] == ""
+
+
+# ---------------------------------------------------------------------------
+# fetch_article_content — fetch failure
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_article_content_fetch_failure() -> None:
+    """fetch_article_content returns error ArticleContent when fetch_url returns None."""
+    with patch("trafilatura.fetch_url", return_value=None):
+        result = asyncio.run(fetch_article_content("https://example.com/article"))
+
+    assert result["error"] != ""
+    assert result["content"] == ""
+    assert result["url"] == "https://example.com/article"
+
+
+# ---------------------------------------------------------------------------
+# fetch_article_content — extraction failure
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_article_content_extraction_failure() -> None:
+    """fetch_article_content returns error when extract returns None."""
+    html = "<html><body>No article here.</body></html>"
+    mock_metadata = MagicMock()
+    mock_metadata.title = "Some Title"
+    mock_metadata.author = ""
+    mock_metadata.date = ""
+
+    with (
+        patch("trafilatura.fetch_url", return_value=html),
+        patch("trafilatura.extract_metadata", return_value=mock_metadata),
+        patch("trafilatura.extract", return_value=None),
+    ):
+        result = asyncio.run(fetch_article_content("https://example.com/article"))
+
+    assert result["error"] != ""
+    assert result["content"] == ""
+    assert result["title"] == "Some Title"
+
+
+# ---------------------------------------------------------------------------
+# fetch_article_content — truncation
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_article_content_truncates_long_content() -> None:
+    """fetch_article_content truncates content at 100 000 chars and sets truncated=True."""
+    html = "<html><body><article>x</article></body></html>"
+    long_content = "x" * 150_000
+
+    with (
+        patch("trafilatura.fetch_url", return_value=html),
+        patch("trafilatura.extract_metadata", return_value=None),
+        patch("trafilatura.extract", return_value=long_content),
+    ):
+        result = asyncio.run(fetch_article_content("https://example.com/article"))
+
+    assert len(result["content"]) == 100_000
+    assert result["truncated"] is True
+    assert result["error"] == ""

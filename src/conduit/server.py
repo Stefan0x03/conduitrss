@@ -215,6 +215,23 @@ async def get_feed_items(url: str, limit: int = 50) -> list[feeds.FeedItem]:
 
 
 @mcp.tool()
+async def get_article_content(url: str) -> feeds.ArticleContent:
+    """Fetch and extract the full plain-text content of an article from its URL.
+
+    *url* should be the ``link`` field from a feed item returned by
+    :func:`get_feed_items` or :func:`get_all_items`.  No subscription check
+    is performed — any URL the authenticated user supplies is accepted.
+
+    Returns a dict with ``title``, ``author``, ``published``, ``content``
+    (plain text, up to 100 000 characters), ``truncated`` (bool), and
+    ``error`` (empty string on success).  On failure ``error`` is non-empty
+    and ``content`` is an empty string — this tool never raises.
+    """
+    _get_user_id()  # enforce authentication; result unused
+    return await feeds.fetch_article_content(url)
+
+
+@mcp.tool()
 async def get_all_items(limit: int = 200) -> list[feeds.AggregatedFeedItem]:
     """Fetch a headline index across all subscribed feeds (no summaries).
 

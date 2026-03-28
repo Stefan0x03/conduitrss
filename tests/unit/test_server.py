@@ -22,11 +22,13 @@ pytestmark = [pytest.mark.unit]
 os.environ.setdefault("DYNAMODB_TABLE", "test-conduit-feeds")
 os.environ.setdefault("AUTH_DISABLED", "true")
 
+from conduit.feeds import ArticleContent  # noqa: E402
 from conduit.server import (  # noqa: E402
     LOCAL_USER_ID,
     _get_user_id,
     add_feed,
     get_all_items,
+    get_article_content,
     get_feed_items,
     list_feeds,
     remove_feed,
@@ -225,3 +227,31 @@ def test_get_all_items_returns_empty_for_zero_feeds() -> None:
         result = asyncio.run(get_all_items(limit=200))
 
     assert result == []
+
+
+# ---------------------------------------------------------------------------
+# get_article_content
+# ---------------------------------------------------------------------------
+
+
+def test_get_article_content_delegates_to_feeds() -> None:
+    """get_article_content calls feeds.fetch_article_content and returns its result."""
+    expected: ArticleContent = ArticleContent(
+        url="https://example.com/article",
+        title="Test Title",
+        author="Test Author",
+        published="2024-06-01",
+        content="Full article text.",
+        truncated=False,
+        error="",
+    )
+
+    with patch(
+        "conduit.server.feeds.fetch_article_content",
+        new_callable=AsyncMock,
+        return_value=expected,
+    ) as mock_fetch:
+        result = asyncio.run(get_article_content("https://example.com/article"))
+
+        mock_fetch.assert_awaited_once_with("https://example.com/article")
+        assert result == expected
