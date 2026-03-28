@@ -170,9 +170,10 @@ async def add_feed(url: str, label: str | None = None) -> dict[str, str | None]:
     is unreachable or not a valid feed; in that case storage is never touched.
     """
     user_id = _get_user_id()
-    await feeds.validate_feed(url)
-    storage.add_feed(user_id, url, label)
-    return {"url": url, "label": label, "status": "added"}
+    feed_title = await feeds.validate_feed(url)
+    effective_label = label or feed_title or None
+    storage.add_feed(user_id, url, effective_label)
+    return {"url": url, "label": effective_label, "status": "added"}
 
 
 @mcp.tool()

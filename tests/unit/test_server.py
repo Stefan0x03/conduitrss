@@ -88,6 +88,58 @@ def test_add_feed_calls_validate_before_storage() -> None:
         )
 
 
+def test_add_feed_uses_feed_title_when_no_label_supplied() -> None:
+    """add_feed falls back to the feed title returned by validate_feed when label is None."""
+    with (
+        patch(
+            "conduit.server.feeds.validate_feed", new_callable=AsyncMock
+        ) as mock_validate,
+        patch("conduit.server.storage.add_feed") as mock_add,
+    ):
+        mock_validate.return_value = "Feed Title From RSS"
+
+        result = asyncio.run(add_feed("https://example.com/feed.xml"))
+
+        mock_add.assert_called_once_with(
+            LOCAL_USER_ID, "https://example.com/feed.xml", "Feed Title From RSS"
+        )
+        assert result["label"] == "Feed Title From RSS"
+
+
+def test_add_feed_uses_none_when_no_label_and_no_feed_title() -> None:
+    """add_feed stores None when neither a label nor a feed title is available."""
+    with (
+        patch(
+            "conduit.server.feeds.validate_feed", new_callable=AsyncMock
+        ) as mock_validate,
+        patch("conduit.server.storage.add_feed") as mock_add,
+    ):
+        mock_validate.return_value = None
+
+        result = asyncio.run(add_feed("https://example.com/feed.xml"))
+
+        mock_add.assert_called_once_with(LOCAL_USER_ID, "https://example.com/feed.xml", None)
+        assert result["label"] is None
+
+
+def test_add_feed_explicit_label_wins_over_feed_title() -> None:
+    """An explicitly supplied label is always used, even when validate_feed returns a title."""
+    with (
+        patch(
+            "conduit.server.feeds.validate_feed", new_callable=AsyncMock
+        ) as mock_validate,
+        patch("conduit.server.storage.add_feed") as mock_add,
+    ):
+        mock_validate.return_value = "Feed Title From RSS"
+
+        result = asyncio.run(add_feed("https://example.com/feed.xml", label="My Label"))
+
+        mock_add.assert_called_once_with(
+            LOCAL_USER_ID, "https://example.com/feed.xml", "My Label"
+        )
+        assert result["label"] == "My Label"
+
+
 def test_add_feed_does_not_call_storage_when_validate_raises() -> None:
     """If validate_feed raises, storage.add_feed must never be called."""
     with (

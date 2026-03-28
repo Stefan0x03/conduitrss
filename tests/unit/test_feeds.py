@@ -1,6 +1,7 @@
 """Unit tests for conduit.feeds."""
 
 import asyncio
+import socket
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -10,6 +11,7 @@ from conduit.feeds import (
     AggregatedFeedItem,
     ArticleContent,
     FeedItem,
+    _check_url_safe,
     fetch_all_items,
     fetch_article_content,
     fetch_items,
@@ -141,7 +143,10 @@ def test_validate_feed_raises_on_malformed_feed() -> None:
     exc = Exception("Connection refused")
     parsed = _make_parsed([], bozo=True, bozo_exception=exc)
 
-    with patch("feedparser.parse", return_value=parsed):
+    with (
+        patch("conduit.feeds._check_url_safe"),
+        patch("feedparser.parse", return_value=parsed),
+    ):
         with pytest.raises(ValueError, match="malformed"):
             asyncio.run(validate_feed("https://not-a-feed.example.com/"))
 
@@ -155,13 +160,58 @@ def test_validate_feed_accepts_empty_feed() -> None:
     """validate_feed does not raise for a valid feed with zero entries."""
     parsed = _make_parsed([])
 
-    with patch("feedparser.parse", return_value=parsed):
+    with (
+        patch("conduit.feeds._check_url_safe"),
+        patch("feedparser.parse", return_value=parsed),
+    ):
         asyncio.run(validate_feed("https://example.com/empty.xml"))  # must not raise
 
 
 # ---------------------------------------------------------------------------
 # validate_feed — CharacterEncodingOverride is not fatal
 # ---------------------------------------------------------------------------
+
+
+def test_validate_feed_returns_feed_title_when_present() -> None:
+    """validate_feed returns the feed-level title string when the feed has one."""
+    parsed = _make_parsed([])
+    parsed.feed.title = "My Blog"
+
+    with (
+        patch("conduit.feeds._check_url_safe"),
+        patch("feedparser.parse", return_value=parsed),
+    ):
+        result = asyncio.run(validate_feed("https://example.com/feed.xml"))
+
+    assert result == "My Blog"
+
+
+def test_validate_feed_returns_none_when_title_is_empty() -> None:
+    """validate_feed returns None when the feed title is an empty or whitespace string."""
+    parsed = _make_parsed([])
+    parsed.feed.title = "   "
+
+    with (
+        patch("conduit.feeds._check_url_safe"),
+        patch("feedparser.parse", return_value=parsed),
+    ):
+        result = asyncio.run(validate_feed("https://example.com/feed.xml"))
+
+    assert result is None
+
+
+def test_validate_feed_returns_none_when_feed_object_missing() -> None:
+    """validate_feed returns None gracefully when parsed.feed is None."""
+    parsed = _make_parsed([])
+    parsed.feed = None
+
+    with (
+        patch("conduit.feeds._check_url_safe"),
+        patch("feedparser.parse", return_value=parsed),
+    ):
+        result = asyncio.run(validate_feed("https://example.com/feed.xml"))
+
+    assert result is None
 
 
 def test_validate_feed_accepts_character_encoding_override() -> None:
@@ -177,7 +227,10 @@ def test_validate_feed_accepts_character_encoding_override() -> None:
     )
     parsed = _make_parsed([entry], bozo=True, bozo_exception=enc_exc)
 
-    with patch("feedparser.parse", return_value=parsed):
+    with (
+        patch("conduit.feeds._check_url_safe"),
+        patch("feedparser.parse", return_value=parsed),
+    ):
         asyncio.run(validate_feed("https://example.com/enc-feed.xml"))  # must not raise
 
 
@@ -262,6 +315,7 @@ def test_fetch_article_content_success() -> None:
     mock_metadata.date = "2024-06-01"
 
     with (
+        patch("conduit.feeds._check_url_safe"),
         patch("trafilatura.fetch_url", return_value=html),
         patch("trafilatura.extract_metadata", return_value=mock_metadata),
         patch("trafilatura.extract", return_value="Full article text here."),
@@ -286,7 +340,10 @@ def test_fetch_article_content_success() -> None:
 
 def test_fetch_article_content_fetch_failure() -> None:
     """fetch_article_content returns error ArticleContent when fetch_url returns None."""
-    with patch("trafilatura.fetch_url", return_value=None):
+    with (
+        patch("conduit.feeds._check_url_safe"),
+        patch("trafilatura.fetch_url", return_value=None),
+    ):
         result = asyncio.run(fetch_article_content("https://example.com/article"))
 
     assert result["error"] != ""
@@ -308,6 +365,7 @@ def test_fetch_article_content_extraction_failure() -> None:
     mock_metadata.date = ""
 
     with (
+        patch("conduit.feeds._check_url_safe"),
         patch("trafilatura.fetch_url", return_value=html),
         patch("trafilatura.extract_metadata", return_value=mock_metadata),
         patch("trafilatura.extract", return_value=None),
@@ -330,6 +388,7 @@ def test_fetch_article_content_truncates_long_content() -> None:
     long_content = "x" * 150_000
 
     with (
+        patch("conduit.feeds._check_url_safe"),
         patch("trafilatura.fetch_url", return_value=html),
         patch("trafilatura.extract_metadata", return_value=None),
         patch("trafilatura.extract", return_value=long_content),
@@ -339,3 +398,222 @@ def test_fetch_article_content_truncates_long_content() -> None:
     assert len(result["content"]) == 100_000
     assert result["truncated"] is True
     assert result["error"] == ""
+
+
+# ---------------------------------------------------------------------------
+# _check_url_safe — helpers
+# ---------------------------------------------------------------------------
+
+# getaddrinfo return format: list of (family, type, proto, canonname, sockaddr)
+# sockaddr for IPv4: (ip_str, port); for IPv6: (ip_str, port, flowinfo, scope_id)
+
+
+def _addrinfo(ip: str) -> list[tuple[int, int, int, str, tuple[str, int]]]:
+    """Build a minimal getaddrinfo result for a single IP."""
+    return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, 0))]
+
+
+def _addrinfo6(ip: str) -> list[tuple[int, int, int, str, tuple[str, int, int, int]]]:
+    """Build a minimal getaddrinfo result for a single IPv6 address."""
+    return [(socket.AF_INET6, socket.SOCK_STREAM, 6, "", (ip, 0, 0, 0))]
+
+
+# ---------------------------------------------------------------------------
+# _check_url_safe — scheme validation
+# ---------------------------------------------------------------------------
+
+
+def test_check_url_safe_accepts_https() -> None:
+    """https scheme with a public IP is accepted without raising."""
+    with patch("socket.getaddrinfo", return_value=_addrinfo("93.184.216.34")):
+        _check_url_safe("https://example.com/feed.xml")  # must not raise
+
+
+def test_check_url_safe_accepts_http() -> None:
+    """http scheme with a public IP is accepted without raising."""
+    with patch("socket.getaddrinfo", return_value=_addrinfo("93.184.216.34")):
+        _check_url_safe("http://example.com/feed.xml")  # must not raise
+
+
+def test_check_url_safe_rejects_file_scheme() -> None:
+    """file:// scheme is rejected before any DNS lookup."""
+    with pytest.raises(ValueError, match="scheme"):
+        _check_url_safe("file:///etc/passwd")
+
+
+def test_check_url_safe_rejects_ftp_scheme() -> None:
+    """ftp:// scheme is rejected before any DNS lookup."""
+    with pytest.raises(ValueError, match="scheme"):
+        _check_url_safe("ftp://example.com/feed.xml")
+
+
+def test_check_url_safe_rejects_gopher_scheme() -> None:
+    """gopher:// scheme is rejected before any DNS lookup."""
+    with pytest.raises(ValueError, match="scheme"):
+        _check_url_safe("gopher://example.com/")
+
+
+def test_check_url_safe_rejects_missing_hostname() -> None:
+    """URL with no hostname component is rejected."""
+    with pytest.raises(ValueError, match="hostname"):
+        _check_url_safe("https:///no-host/path")
+
+
+# ---------------------------------------------------------------------------
+# _check_url_safe — DNS failure
+# ---------------------------------------------------------------------------
+
+
+def test_check_url_safe_rejects_unresolvable_hostname() -> None:
+    """Hostname that cannot be resolved raises ValueError."""
+    with patch(
+        "socket.getaddrinfo", side_effect=socket.gaierror("Name or service not known")
+    ):
+        with pytest.raises(ValueError, match="Could not resolve"):
+            _check_url_safe("https://does-not-exist.invalid/feed")
+
+
+# ---------------------------------------------------------------------------
+# _check_url_safe — loopback
+# ---------------------------------------------------------------------------
+
+
+def test_check_url_safe_rejects_ipv4_loopback() -> None:
+    """127.0.0.1 (loopback) is rejected."""
+    with patch("socket.getaddrinfo", return_value=_addrinfo("127.0.0.1")):
+        with pytest.raises(ValueError, match="non-public"):
+            _check_url_safe("https://localhost/feed")
+
+
+def test_check_url_safe_rejects_ipv6_loopback() -> None:
+    """::1 (IPv6 loopback) is rejected."""
+    with patch("socket.getaddrinfo", return_value=_addrinfo6("::1")):
+        with pytest.raises(ValueError, match="non-public"):
+            _check_url_safe("https://localhost/feed")
+
+
+# ---------------------------------------------------------------------------
+# _check_url_safe — AWS instance metadata endpoint
+# ---------------------------------------------------------------------------
+
+
+def test_check_url_safe_rejects_aws_metadata_endpoint() -> None:
+    """169.254.169.254 (AWS instance metadata link-local) is rejected."""
+    with patch("socket.getaddrinfo", return_value=_addrinfo("169.254.169.254")):
+        with pytest.raises(ValueError, match="non-public"):
+            _check_url_safe("http://169.254.169.254/latest/meta-data/")
+
+
+def test_check_url_safe_rejects_link_local_via_hostname() -> None:
+    """A hostname that resolves to a link-local address is rejected."""
+    with patch("socket.getaddrinfo", return_value=_addrinfo("169.254.0.1")):
+        with pytest.raises(ValueError, match="non-public"):
+            _check_url_safe("https://metadata.internal/feed")
+
+
+# ---------------------------------------------------------------------------
+# _check_url_safe — RFC 1918 private ranges
+# ---------------------------------------------------------------------------
+
+
+def test_check_url_safe_rejects_rfc1918_10_block() -> None:
+    """10.0.0.0/8 addresses are rejected."""
+    with patch("socket.getaddrinfo", return_value=_addrinfo("10.0.0.1")):
+        with pytest.raises(ValueError, match="non-public"):
+            _check_url_safe("https://internal.corp/feed")
+
+
+def test_check_url_safe_rejects_rfc1918_172_block() -> None:
+    """172.16.0.0/12 addresses are rejected."""
+    with patch("socket.getaddrinfo", return_value=_addrinfo("172.16.0.1")):
+        with pytest.raises(ValueError, match="non-public"):
+            _check_url_safe("https://internal.corp/feed")
+
+
+def test_check_url_safe_rejects_rfc1918_192_168_block() -> None:
+    """192.168.0.0/16 addresses are rejected."""
+    with patch("socket.getaddrinfo", return_value=_addrinfo("192.168.1.100")):
+        with pytest.raises(ValueError, match="non-public"):
+            _check_url_safe("https://router.local/feed")
+
+
+# ---------------------------------------------------------------------------
+# _check_url_safe — hostname resolving to private IP (SSRF via DNS)
+# ---------------------------------------------------------------------------
+
+
+def test_check_url_safe_rejects_hostname_resolving_to_private_ip() -> None:
+    """A public-looking hostname that resolves to a private IP is rejected."""
+    with patch("socket.getaddrinfo", return_value=_addrinfo("192.168.0.1")):
+        with pytest.raises(ValueError, match="non-public"):
+            _check_url_safe("https://totally-legit-feed.com/rss")
+
+
+def test_check_url_safe_rejects_if_any_resolved_address_is_private() -> None:
+    """If a hostname resolves to both a public and a private IP, it is rejected."""
+    mixed = [
+        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0)),
+        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.1", 0)),
+    ]
+    with patch("socket.getaddrinfo", return_value=mixed):
+        with pytest.raises(ValueError, match="non-public"):
+            _check_url_safe("https://dual-stack.example.com/feed")
+
+
+# ---------------------------------------------------------------------------
+# _check_url_safe — integration with validate_feed
+# ---------------------------------------------------------------------------
+
+
+def test_validate_feed_propagates_ssrf_check_failure() -> None:
+    """validate_feed raises ValueError (not calling feedparser) when URL is unsafe."""
+    with (
+        patch("socket.getaddrinfo", return_value=_addrinfo("192.168.1.1")),
+        patch("feedparser.parse") as mock_parse,
+    ):
+        with pytest.raises(ValueError, match="non-public"):
+            asyncio.run(validate_feed("https://internal.example.com/feed"))
+
+    mock_parse.assert_not_called()
+
+
+def test_validate_feed_propagates_bad_scheme_failure() -> None:
+    """validate_feed raises ValueError for a non-http/https scheme without fetching."""
+    with patch("feedparser.parse") as mock_parse:
+        with pytest.raises(ValueError, match="scheme"):
+            asyncio.run(validate_feed("file:///etc/passwd"))
+
+    mock_parse.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# _check_url_safe — integration with fetch_article_content
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_article_content_rejects_private_ip() -> None:
+    """fetch_article_content returns an error (no raise) for a private-IP URL."""
+    with (
+        patch("socket.getaddrinfo", return_value=_addrinfo("10.0.0.1")),
+        patch("trafilatura.fetch_url") as mock_fetch,
+    ):
+        result = asyncio.run(fetch_article_content("https://internal.example.com/article"))
+
+    assert result["error"] != ""
+    assert result["content"] == ""
+    mock_fetch.assert_not_called()
+
+
+def test_fetch_article_content_rejects_aws_metadata() -> None:
+    """fetch_article_content blocks requests to the AWS instance metadata endpoint."""
+    with (
+        patch("socket.getaddrinfo", return_value=_addrinfo("169.254.169.254")),
+        patch("trafilatura.fetch_url") as mock_fetch,
+    ):
+        result = asyncio.run(
+            fetch_article_content("http://169.254.169.254/latest/meta-data/iam/security-credentials/")
+        )
+
+    assert result["error"] != ""
+    assert result["content"] == ""
+    mock_fetch.assert_not_called()

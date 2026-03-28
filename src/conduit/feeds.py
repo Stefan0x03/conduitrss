@@ -1,7 +1,10 @@
 """Live HTTP fetch and parse via feedparser."""
 
 import asyncio
+import ipaddress
 import logging
+import socket
+import urllib.parse
 from typing import TypedDict
 
 import feedparser
@@ -86,17 +89,68 @@ def _is_malformed(parsed: object) -> bool:
     return not isinstance(exc, CharacterEncodingOverride)
 
 
-async def validate_feed(url: str) -> None:
+def _check_url_safe(url: str) -> None:
+    """Pre-flight SSRF check: validate scheme and reject non-public IPs.
+
+    Must be called before any outbound HTTP request. Raises :exc:`ValueError` if:
+
+    - The scheme is not ``http`` or ``https``.
+    - The hostname cannot be resolved.
+    - Any resolved address is not globally routable (loopback, link-local,
+      RFC 1918 private ranges, reserved ranges, the AWS metadata endpoint, etc.).
+
+    DNS resolution is performed here so the check covers hostnames that map to
+    private IPs, not just bare IP literals. This does not fully prevent DNS
+    rebinding but eliminates the common cases.
+    """
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(
+            f"URL scheme {parsed.scheme!r} is not permitted; only http and https are allowed"
+        )
+
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("URL has no hostname")
+
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror as exc:
+        raise ValueError(f"Could not resolve hostname {hostname!r}: {exc}") from exc
+
+    for *_, sockaddr in infos:
+        addr_str = sockaddr[0]
+        try:
+            ip = ipaddress.ip_address(addr_str)
+        except ValueError:
+            continue
+        if not ip.is_global:
+            raise ValueError(
+                f"URL resolves to a non-public address ({ip}) — "
+                "requests to private, loopback, link-local, or reserved addresses are not allowed"
+            )
+
+
+async def validate_feed(url: str) -> str | None:
     """Confirm URL is reachable and parses as a valid RSS/Atom feed.
 
-    Raises ValueError if the feed is malformed. A feed with zero entries is
-    valid. CharacterEncodingOverride bozo exceptions are not treated as fatal.
+    Raises ValueError if the URL fails the pre-flight safety check, is
+    unreachable, or the response is not a valid RSS/Atom feed. A feed with
+    zero entries is valid. CharacterEncodingOverride bozo exceptions are not
+    treated as fatal.
+
+    Returns the feed's own title string if present, or None if the feed
+    has no title or the title is empty.
     """
     loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, _check_url_safe, url)
     parsed: object = await loop.run_in_executor(None, feedparser.parse, url)
     if _is_malformed(parsed):
         exc: object = getattr(parsed, "bozo_exception", None)
         raise ValueError(f"Feed at {url!r} is malformed: {exc}")
+    feed_obj: object = getattr(parsed, "feed", None)
+    raw_title: object = getattr(feed_obj, "title", None) if feed_obj is not None else None
+    return raw_title if isinstance(raw_title, str) and raw_title.strip() else None
 
 
 async def fetch_items(url: str, limit: int = 50) -> list[FeedItem]:
@@ -131,6 +185,11 @@ def _do_fetch_article(url: str) -> ArticleContent:
     empty = ArticleContent(
         url=url, title="", author="", published="", content="", truncated=False, error=""
     )
+
+    try:
+        _check_url_safe(url)
+    except ValueError as exc:
+        return {**empty, "error": str(exc)}
 
     html: object = trafilatura.fetch_url(url)
     if not isinstance(html, str):
