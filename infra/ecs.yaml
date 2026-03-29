@@ -10,15 +10,6 @@ Parameters:
   ImageUri:
     Type: String
     Description: ECR image URI (e.g. 123456789.dkr.ecr.us-east-1.amazonaws.com/conduit:latest)
-  PrivateSubnetIds:
-    Type: List<AWS::EC2::Subnet::Id>
-    Description: Private subnets for ECS tasks
-  VpcId:
-    Type: AWS::EC2::VPC::Id
-  CognitoUserPoolId:
-    Type: String
-  CognitoAppClientId:
-    Type: String
 
 Resources:
   EcsCluster:
@@ -44,6 +35,16 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: SSMSecretAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameters
+                Resource:
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/conduit/${Environment}/cognito-client-secret"
 
   TaskRole:
     Type: AWS::IAM::Role
@@ -81,7 +82,8 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow inbound from ALB only
-      VpcId: !Ref VpcId
+      VpcId:
+        Fn::ImportValue: !Sub "conduit-vpc-id-${Environment}"
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 8000
@@ -115,11 +117,16 @@ Resources:
             - Name: AWS_REGION
               Value: !Ref AWS::Region
             - Name: COGNITO_USER_POOL_ID
-              Value: !Ref CognitoUserPoolId
+              Value:
+                Fn::ImportValue: !Sub "conduit-user-pool-id-${Environment}"
             - Name: COGNITO_APP_CLIENT_ID
-              Value: !Ref CognitoAppClientId
+              Value:
+                Fn::ImportValue: !Sub "conduit-app-client-id-${Environment}"
             - Name: DOMAIN
               Value: !Ref Domain
+          Secrets:
+            - Name: COGNITO_CLIENT_SECRET
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/conduit/${Environment}/cognito-client-secret"
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -127,7 +134,6 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: conduit
           Essential: true
-          ReadonlyRootFilesystem: true
 
   EcsService:
     Type: AWS::ECS::Service
@@ -139,10 +145,12 @@ Resources:
       LaunchType: FARGATE
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
+          AssignPublicIp: ENABLED
           SecurityGroups:
             - !Ref EcsSecurityGroup
-          Subnets: !Ref PrivateSubnetIds
+          Subnets: !Split
+            - ","
+            - Fn::ImportValue: !Sub "conduit-public-subnet-ids-${Environment}"
       LoadBalancers:
         - ContainerName: conduit
           ContainerPort: 8000

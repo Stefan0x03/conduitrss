@@ -7,22 +7,27 @@ Parameters:
     AllowedValues: [dev, prod]
   Domain:
     Type: String
-    Description: Service domain (e.g. conduit.YOUR_DOMAIN)
-  VpcId:
-    Type: AWS::EC2::VPC::Id
-  PublicSubnetIds:
-    Type: List<AWS::EC2::Subnet::Id>
-    Description: At least two public subnets for the ALB
-  CertificateArn:
-    Type: String
-    Description: ARN of an existing ACM certificate for the domain
+    Description: Service domain (e.g. conduit-dev.conduitrss.com)
+  HostedZoneId:
+    Type: AWS::Route53::HostedZone::Id
+    Description: Route 53 hosted zone ID for the domain (looked up by Makefile)
 
 Resources:
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref Domain
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref Domain
+          HostedZoneId: !Ref HostedZoneId
+
   AlbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow HTTPS inbound to ALB
-      VpcId: !Ref VpcId
+      VpcId:
+        Fn::ImportValue: !Sub "conduit-vpc-id-${Environment}"
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 443
@@ -44,7 +49,9 @@ Resources:
       Type: application
       SecurityGroups:
         - !Ref AlbSecurityGroup
-      Subnets: !Ref PublicSubnetIds
+      Subnets: !Split
+        - ","
+        - Fn::ImportValue: !Sub "conduit-public-subnet-ids-${Environment}"
 
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -52,7 +59,8 @@ Resources:
       Name: !Sub "conduit-tg-${Environment}"
       Protocol: HTTP
       Port: 8000
-      VpcId: !Ref VpcId
+      VpcId:
+        Fn::ImportValue: !Sub "conduit-vpc-id-${Environment}"
       TargetType: ip
       HealthCheckPath: /healthz
       HealthCheckIntervalSeconds: 30
@@ -67,11 +75,23 @@ Resources:
       Protocol: HTTPS
       Port: 443
       Certificates:
-        - CertificateArn: !Ref CertificateArn
+        - CertificateArn: !Ref Certificate
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
       SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+
+  # Route 53 alias record pointing the domain at the ALB
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref Domain
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApplicationLoadBalancer.DNSName
+        EvaluateTargetHealth: true
+        HostedZoneId: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
 
 Outputs:
   AlbDnsName:

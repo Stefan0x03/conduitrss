@@ -51,9 +51,12 @@ Resources:
         - profile
         - email
       CallbackURLs:
-        - !Sub "https://${Domain}/oauth/callback"
+        - !Sub "https://${Domain}/auth/callback"
+        - http://localhost:3334/oauth/callback
+        - https://claude.ai/api/mcp/auth_callback
       LogoutURLs:
         - !Sub "https://${Domain}/logout"
+        - http://localhost:3334/logout
       SupportedIdentityProviders:
         - COGNITO
       ExplicitAuthFlows:

@@ -1,11 +1,4 @@
 [
-  { "ParameterKey": "Environment",          "ParameterValue": "prod" },
-  { "ParameterKey": "Domain",               "ParameterValue": "conduit.YOUR_DOMAIN" },
-  { "ParameterKey": "VpcId",                "ParameterValue": "vpc-REPLACE_ME" },
-  { "ParameterKey": "PublicSubnetIds",      "ParameterValue": "subnet-REPLACE_ME_1,subnet-REPLACE_ME_2" },
-  { "ParameterKey": "PrivateSubnetIds",     "ParameterValue": "subnet-REPLACE_ME_3,subnet-REPLACE_ME_4" },
-  { "ParameterKey": "CertificateArn",       "ParameterValue": "arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/REPLACE_ME" },
-  { "ParameterKey": "ImageUri",             "ParameterValue": "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/conduit:latest" },
-  { "ParameterKey": "CognitoUserPoolId",    "ParameterValue": "us-east-1_REPLACE_ME" },
-  { "ParameterKey": "CognitoAppClientId",   "ParameterValue": "REPLACE_ME" }
+  { "ParameterKey": "Environment", "ParameterValue": "prod" },
+  { "ParameterKey": "Domain",      "ParameterValue": "connector.conduitrss.com" }
 ]
