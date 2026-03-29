@@ -9,7 +9,7 @@ from typing import TypedDict
 
 import feedparser
 import trafilatura
-from feedparser.exceptions import CharacterEncodingOverride
+from feedparser.exceptions import CharacterEncodingOverride, NonXMLContentType
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +79,9 @@ def _is_malformed(parsed: object) -> bool:
 
     CharacterEncodingOverride is not treated as fatal — it indicates a minor
     encoding mismatch on an otherwise valid feed.
+
+    NonXMLContentType is not treated as fatal — some hosts (e.g. GitHub raw)
+    serve valid RSS/Atom XML with a text/plain content-type header.
     """
     bozo: object = getattr(parsed, "bozo", False)
     if not bozo:
@@ -86,7 +89,7 @@ def _is_malformed(parsed: object) -> bool:
     exc: object = getattr(parsed, "bozo_exception", None)
     if exc is None:
         return False
-    return not isinstance(exc, CharacterEncodingOverride)
+    return not isinstance(exc, (CharacterEncodingOverride, NonXMLContentType))
 
 
 def _check_url_safe(url: str) -> None:
@@ -148,6 +151,9 @@ async def validate_feed(url: str) -> str | None:
     if _is_malformed(parsed):
         exc: object = getattr(parsed, "bozo_exception", None)
         raise ValueError(f"Feed at {url!r} is malformed: {exc}")
+    version: object = getattr(parsed, "version", None)
+    if not isinstance(version, str) or not version:
+        raise ValueError(f"URL {url!r} does not appear to be a valid RSS/Atom feed")
     feed_obj: object = getattr(parsed, "feed", None)
     raw_title: object = getattr(feed_obj, "title", None) if feed_obj is not None else None
     return raw_title if isinstance(raw_title, str) and raw_title.strip() else None
