@@ -8,7 +8,8 @@ STACK_PREFIX   = $(PROJECT_NAME)
 ECR_REPO       = $(PROJECT_NAME)
 AWS_ACCOUNT_ID = $(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION     = $(shell aws configure get region)
-IMAGE_URI      = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPO):latest
+GIT_SHA        = $(shell git rev-parse --short HEAD)
+IMAGE_URI      = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPO):$(GIT_SHA)
 PARAMS         = $(shell jq -r '.[] | "\(.ParameterKey)=\(.ParameterValue)"' infra/params/$(ENV).json | tr '\n' ' ')
 DOMAIN         = $(shell jq -r '.[] | select(.ParameterKey=="Domain") | .ParameterValue' infra/params/$(ENV).json)
 ROOT_DOMAIN    = $(shell echo $(DOMAIN) | awk -F. '{print $$(NF-1)"."$$NF}')
@@ -71,7 +72,7 @@ deploy-image:
 		aws ecr create-repository --repository-name $(ECR_REPO) --region $(AWS_REGION)
 	aws ecr get-login-password --region $(AWS_REGION) | \
 		docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-	docker buildx build --platform linux/amd64 --push -t $(IMAGE_URI) .
+	docker buildx build --platform linux/amd64 --push -t $(IMAGE_URI) -t $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPO):latest .
 
 deploy-ecs:
 	aws cloudformation deploy \
