@@ -1,4 +1,4 @@
 [
   { "ParameterKey": "Environment", "ParameterValue": "dev" },
-  { "ParameterKey": "Domain",      "ParameterValue": "conduit-dev.conduitrss.com" }
+  { "ParameterKey": "Domain",      "ParameterValue": "connector-dev.conduitrss.com" }
 ]
